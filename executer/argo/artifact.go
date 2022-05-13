@@ -10,7 +10,7 @@ func getDAGArtifactsByIncome(income []string) v1alpha1.Artifacts {
 	for _, str := range income {
 		artifact := v1alpha1.Artifact{
 			Name: str + "-art",
-			From: "{{dag." + str + ".outputs.artifacts." + str + "-art}}",
+			From: "{{tasks." + str + ".outputs.artifacts." + str + "-art}}",
 		}
 		artifacts = append(artifacts, artifact)
 	}
