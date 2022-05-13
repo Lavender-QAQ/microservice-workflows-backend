@@ -2,7 +2,9 @@ package argo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 
 	"github.com/Lavender-QAQ/microservice-workflows-backend/executer/common"
 	"github.com/Lavender-QAQ/microservice-workflows-backend/executer/kubernetes"
@@ -50,8 +52,8 @@ func CreateWorkflow(logger logr.Logger, name string, dag *map[string]common.Node
 	fmt.Println(createdWf.Name)
 
 	// // Demo Start
-	// data, _ := json.Marshal(workflow)
-	// ioutil.WriteFile("test.json", data, 0666)
+	data, _ := json.Marshal(workflow)
+	ioutil.WriteFile("test.json", data, 0666)
 	// fmt.Println(string(data))
 	// // Demo End
 
