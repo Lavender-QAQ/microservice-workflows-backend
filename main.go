@@ -22,6 +22,8 @@ import (
 
 	"github.com/Lavender-QAQ/microservice-workflows-backend/conf"
 
+	"github.com/Lavender-QAQ/microservice-workflows-backend/executer/kubernetes"
+
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -35,7 +37,6 @@ import (
 
 	//+kubebuilder:scaffold:imports
 
-	"github.com/Lavender-QAQ/microservice-workflows-backend/executer/kubernetes"
 	"github.com/Lavender-QAQ/microservice-workflows-backend/handler"
 	"github.com/Lavender-QAQ/microservice-workflows-backend/router"
 )
@@ -62,8 +63,6 @@ func registerLogger() error {
 }
 
 func main() {
-	conf.Init()
-
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
@@ -85,12 +84,12 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	// Get restconfig
-	restConf := ctrl.GetConfigOrDie()
+	// init everything
+	conf.Init(namespace)
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(restConf, ctrl.Options{
+	mgr, err := ctrl.NewManager(kubernetes.RestConf, ctrl.Options{
 		Scheme:                 scheme,
 		Namespace:              namespace,
 		MetricsBindAddress:     metricsAddr,
@@ -108,13 +107,6 @@ func main() {
 	err = registerLogger()
 	if err != nil {
 		logger.Error(err, "Fail to register logger")
-		return
-	}
-
-	// Init client-go
-	err = kubernetes.Init(restConf, namespace)
-	if err != nil {
-		logger.Error(err, "Fail to initialize kubernetes cluster")
 		return
 	}
 

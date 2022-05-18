@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 )
 
 var namespace string
@@ -10,14 +11,16 @@ var KubeConfig []byte
 var clientset *kubernetes.Clientset
 var RestConf *rest.Config
 
-func Init(restConf *rest.Config, ns string) error {
+func Init(ns string) error {
+	RestConf = ctrl.GetConfigOrDie()
+	namespace = ns
+
 	var err error
-	clientset, err = InitClient(restConf)
+	clientset, err = InitClient(RestConf)
 	if err != nil {
 		return err
 	}
-	RestConf = restConf
-	namespace = ns
+
 	PodAdapter = clientset.CoreV1().Pods(namespace)
 	DeploymentAdapter = clientset.AppsV1().Deployments(namespace)
 	ServiceAdapter = clientset.CoreV1().Services(namespace)
@@ -26,6 +29,10 @@ func Init(restConf *rest.Config, ns string) error {
 
 func GetNamespace() string {
 	return namespace
+}
+
+func SetNamespace(ns string) {
+	namespace = ns
 }
 
 // Initialize the K8S client

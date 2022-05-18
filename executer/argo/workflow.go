@@ -13,7 +13,6 @@ import (
 	v1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 
-	wfclientset "github.com/argoproj/argo-workflows/v3/pkg/client/clientset/versioned"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -30,32 +29,20 @@ func CreateWorkflow(logger logr.Logger, name string, dag *map[string]common.Node
 		templates = append(templates, template)
 	}
 
-	workflow := wfv1.Workflow{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: name,
-			Namespace:    kubernetes.GetNamespace(),
-		},
-		Spec: wfv1.WorkflowSpec{
-			Entrypoint: name + "-dag",
-			Templates:  templates,
-		},
-	}
-
-	// create the argo workflow client
-	wfClient := wfclientset.NewForConfigOrDie(kubernetes.GetRestConf()).ArgoprojV1alpha1().Workflows(kubernetes.GetNamespace())
+	// build plain/cron workflow depend on starter node
+	startNode := (*dag)["Starter"].(*StarterNode)
 	ctx := context.Background()
-	createdWf, err := wfClient.Create(ctx, &workflow, metav1.CreateOptions{})
+	var err error
+	if startNode.WorkflowType == "once" {
+		workflow := buildWorkflow(name, templates)
+		err = createWorkflow(workflow, ctx, logger)
+	} else if startNode.WorkflowType == "cron" {
+		cronWorkflow := buildCronWorkflow(name, templates, startNode)
+		err = createCronWorkflow(cronWorkflow, ctx, logger)
+	}
 	if err != nil {
-		logger.Error(err, "Create workflow error")
 		return err
 	}
-	fmt.Println(createdWf.Name)
-
-	// // Demo Start
-	data, _ := json.Marshal(workflow)
-	ioutil.WriteFile("test.json", data, 0666)
-	// fmt.Println(string(data))
-	// // Demo End
 
 	return nil
 }
@@ -87,4 +74,82 @@ func createDAG(logger logr.Logger, name string, dag *map[string]common.NodeInter
 		DAG:  &dags,
 	}
 	return template
+}
+
+func buildWorkflow(name string, templates []wfv1.Template) wfv1.Workflow {
+	workflow := wfv1.Workflow{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: name,
+			Namespace:    kubernetes.GetNamespace(),
+		},
+		Spec: wfv1.WorkflowSpec{
+			Entrypoint: name + "-dag",
+			Templates:  templates,
+		},
+	}
+	data, _ := json.Marshal(workflow)
+	ioutil.WriteFile("test.json", data, 0666)
+	return workflow
+}
+
+func createWorkflow(workflow wfv1.Workflow, ctx context.Context, logger logr.Logger) error {
+	// create the argo workflow client
+	wfClient := WorkflowClient.ArgoprojV1alpha1().Workflows(kubernetes.GetNamespace())
+	_, err := wfClient.Create(ctx, &workflow, metav1.CreateOptions{})
+	if err != nil {
+		logger.Error(err, "Create workflow error")
+		return err
+	}
+	return nil
+}
+
+func buildCronWorkflow(name string, templates []wfv1.Template, startNode *StarterNode) wfv1.CronWorkflow {
+	var cronExpression string
+	var strategy wfv1.ConcurrencyPolicy
+	if startNode.CronExpression != "none" {
+		cronExpression = startNode.CronExpression
+	} else {
+		if startNode.TimeUnit == "m" {
+			cronExpression = fmt.Sprintf("*/%s * * * *", startNode.Interval)
+		} else if startNode.TimeUnit == "h" {
+			cronExpression = fmt.Sprintf("* */%s * * *", startNode.Interval)
+		} else if startNode.TimeUnit == "d" {
+			cronExpression = fmt.Sprintf("* * */%s * *", startNode.Interval)
+		}
+	}
+	if startNode.Strategy == "allow" {
+		strategy = wfv1.AllowConcurrent
+	} else if startNode.Strategy == "replace" {
+		strategy = wfv1.ReplaceConcurrent
+	} else if startNode.Strategy == "forbid" {
+		strategy = wfv1.ForbidConcurrent
+	}
+	cronWorkflow := wfv1.CronWorkflow{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: name,
+			Namespace:    kubernetes.GetNamespace(),
+		},
+		Spec: wfv1.CronWorkflowSpec{
+			Schedule:          cronExpression,
+			ConcurrencyPolicy: strategy,
+			WorkflowSpec: wfv1.WorkflowSpec{
+				Entrypoint: name + "-dag",
+				Templates:  templates,
+			},
+		},
+	}
+	data, _ := json.Marshal(cronWorkflow)
+	ioutil.WriteFile("test.json", data, 0666)
+	return cronWorkflow
+}
+
+func createCronWorkflow(cronWorkflow wfv1.CronWorkflow, ctx context.Context, logger logr.Logger) error {
+	// create CronWorkflow
+	cronWorkflowClient := WorkflowClient.ArgoprojV1alpha1().CronWorkflows(kubernetes.GetNamespace())
+	_, err := cronWorkflowClient.Create(ctx, &cronWorkflow, metav1.CreateOptions{})
+	if err != nil {
+		logger.Error(err, "Create workflow error")
+		return err
+	}
+	return nil
 }

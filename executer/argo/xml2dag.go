@@ -20,6 +20,12 @@ func buildNode(tasks []*etree.Element) {
 	var node_wg sync.WaitGroup
 	for _, node := range tasks {
 		switch node.SelectAttrValue("custom", "none") {
+		case "0":
+			{
+				node_wg.Add(1)
+				go buildStarterNode(*node, &node_wg)
+				break
+			}
 		case "1":
 			{
 				node_wg.Add(1)
@@ -36,6 +42,12 @@ func buildNode(tasks []*etree.Element) {
 			{
 				node_wg.Add(1)
 				go buildSuspendNode(*node, &node_wg)
+				break
+			}
+		case "4":
+			{
+				node_wg.Add(1)
+				go buildFilterNode(*node, &node_wg)
 				break
 			}
 		default:
@@ -61,7 +73,7 @@ func buildFlow(flows []*etree.Element) {
 	}
 }
 
-// The entry function of the entire DAG building module,
+// Xml2Dag The entry function of the entire DAG building module,
 // completes the initialization of the map,
 // loading the etree package, building the DAG, and returning the workflow id
 func Xml2Dag(logger logr.Logger, xmlstr string) (string, *map[string]common.NodeInterface, error) {
@@ -72,12 +84,12 @@ func Xml2Dag(logger logr.Logger, xmlstr string) (string, *map[string]common.Node
 		return "", nil, err
 	}
 	process := doc.SelectElement("definitions").SelectElement("process")
-	process_id := process.SelectAttrValue("id", "none")
+	processId := process.SelectAttrValue("id", "none")
 	buildNode(process.SelectElements("task"))
 	buildFlow(process.SelectElements("sequenceFlow"))
 	// After DAG is built, map stores the set of all nodes
-	if process_id == "none" {
+	if processId == "none" {
 		return "", nil, errors.New("Workflow id is not present")
 	}
-	return process_id, &mp, nil
+	return processId, &mp, nil
 }

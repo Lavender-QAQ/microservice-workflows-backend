@@ -55,7 +55,7 @@ func DeployHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Call executer package
-		starter := executer.NewWorkflowStarter(logger.WithName("executer"), workflowId, mp)
+		starter := executer.NewWorkflowStarter(workflowId, mp, logger.WithName("executer"))
 		// Create workflow
 		err = starter.CreateWorkflow()
 		if err != nil {

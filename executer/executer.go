@@ -7,17 +7,18 @@ import (
 )
 
 type WorkflowStarter struct {
-	Workflow_id string
+	WorkflowId  string
+	StarterNode argo.StarterNode
 	dag         *map[string]common.NodeInterface
 	Logger      logr.Logger
 }
 
 // Constructor of the workflow initiator
-func NewWorkflowStarter(logger logr.Logger, workflow_id string, dag *map[string]common.NodeInterface) *WorkflowStarter {
+func NewWorkflowStarter(workflowId string, dag *map[string]common.NodeInterface, logger logr.Logger) *WorkflowStarter {
 	return &WorkflowStarter{
-		Workflow_id: workflow_id,
-		dag:         dag,
-		Logger:      logger,
+		WorkflowId: workflowId,
+		dag:        dag,
+		Logger:     logger,
 	}
 }
 
@@ -25,7 +26,7 @@ func NewWorkflowStarter(logger logr.Logger, workflow_id string, dag *map[string]
 func (w *WorkflowStarter) CreateWorkflow() error {
 	logger := w.Logger
 
-	err := argo.CreateWorkflow(w.Logger.WithName("argo"), w.Workflow_id, w.dag)
+	err := argo.CreateWorkflow(w.Logger.WithName("argo"), w.WorkflowId, w.dag)
 	if err != nil {
 		logger.Error(err, "Create workflow err")
 		return err
